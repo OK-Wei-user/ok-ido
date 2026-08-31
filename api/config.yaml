@@ -1,0 +1,177 @@
+llm_config:
+  provider: openai
+  base_url: https://api.deepseek.com
+  api_key: sk-yourkey
+  model_name: deepseek-v4-flash
+  temperature: 0.7
+  max_tokens: 8192
+  thinking_mode: enabled
+  # P4-5: reasoning_effort high→medium — 实测98%耗时在LLM调用(平均21.9s/次),
+  # high生成大量reasoning token但ReAct工具决策场景medium已足够,预期单次调用耗时降40%+
+  reasoning_effort: medium
+  context_window: 128000  # P3-1: DeepSeek V4支持1M上下文,128K安全余量大,避免多步骤任务过早触发压缩
+  max_retries: 5  # LLM调用最大重试次数(批次50,503容错增强): 503/502服务不可用时自动重试,配合指数退避
+  supports_image_input: false  # DeepSeek非多模态,工具结果截图不以image_url块发送(会话a34fcdc1根因)
+# 规划Agent轻量化: PlanAgent专用LLM配置(可选,不配置则复用llm_config)
+# PlannerAgent仅做JSON规划输出,无需thinking=high,降级到flash+disabled可节省70%+ token成本与时延
+planner_llm_config:
+  provider: openai
+  base_url: https://api.deepseek.com
+  api_key: sk-yourkey
+  model_name: deepseek-v4-flash
+  temperature: 0.3
+  max_tokens: 4096
+  thinking_mode: disabled
+  reasoning_effort: low
+  context_window: 64000  # P3-1: 规划Agent上下文同步提升(原32K→64K)
+  max_retries: 5  # 规划Agent LLM重试次数(批次50,与主LLM一致)
+# 多模态LLM(可选,不配置则浏览器visual_click视觉兜底自动降级为不可用,五级DOM容错仍完整)
+# 需指向支持图像输入的视觉模型(如qwen-vl-max/gpt-4o)。启用时解除下方注释并填写真实配置。
+# multimodal_llm_config:
+#   provider: openai
+#   base_url: https://<vision-endpoint>
+#   api_key: <key>
+#   model_name: qwen-vl-max
+#   temperature: 0.2
+#   max_tokens: 1024
+#   thinking_mode: disabled
+#   context_window: 32000
+#   max_retries: 3
+agent_config:
+  max_iterations: 300
+  max_retries: 3
+  max_search_results: 10
+  # 会话级超时熔断(P10-3): 超过阈值时注入提示引导LLM快速收敛,0表示不启用
+  # max_iterations=300 与 4小时超时联动: 平均每次迭代30-60s, 300次约覆盖4小时, 时间与迭代预算匹配
+  session_timeout_seconds: 14400  # 硬超时(秒),4小时,强制注入总结指令
+  session_warning_seconds: 12000  # 软警告(秒),200分钟(83%),注入收敛提示
+  # F10-1 流式输出: 最终答案切片推送,降低用户感知时延
+  # is_streaming=True 增量片仅推SSE不写库,is_final=True 完整内容写库
+  stream_final_answer: true
+  stream_chunk_min_chars: 50    # 单片最小字符数(避免过细)
+  stream_chunk_max_chars: 300  # 单片最大字符数(避免过粗)
+  stream_chunk_delay_ms: 30    # 切片推送间隔(毫秒,模拟流式节奏)
+  # F10-6 工具按需装配: 基于步骤描述关键词过滤工具,降低单轮token消耗
+  # 过滤后工具数<tool_filter_min_tools时回退全量装配,保证LLM选择空间
+  tool_filter_enabled: true
+  tool_filter_min_tools: 3      # 过滤后最小工具数,低于此值回退全量
+# 记忆系统配置(P4-1/P4-2,可选,不配置则使用默认值)
+# profile: 配置预设,调整3个百分比阈值覆盖大多数调优场景
+#   - balanced(默认): 平衡压缩频率与信息保留
+#   - lightweight: 延迟压缩,简单对话场景省计算
+#   - heavy: 提前压缩,复杂多步骤任务保护上下文
+# compression_strategy: 压缩策略,控制主动/被动压缩
+#   - auto(默认): 多步骤任务主动压缩,简单对话被动压缩
+#   - proactive: 始终主动压缩
+#   - reactive: 始终被动压缩(仅critical触发)
+memory_config:
+  profile: balanced
+  compression_strategy: auto
+mcp_config:
+  mcpServers:
+    amap:
+      transport: streamable_http
+      enabled: true
+      description: 高德地图MCP服务，提供天气查询、地图导航、位置识别、路线规划等能力
+      env: null
+      command: null
+      args: null
+      url: https://mcp.amap.com/mcp?key=00b05640cc55c0ba2b7f85e0b3f2e6e7
+      headers: null
+    mcp-multimodal:
+      transport: streamable_http
+      enabled: true
+      description: null
+      env: null
+      command: null
+      args: null
+      url: http://mcp-multimodal:9100/mcp
+      headers: null
+    system:
+      transport: streamable_http
+      enabled: true
+      description: 商城供应链系统MCP服务，提供商品分类/商品主档/库存管理/入库明细/出库明细/其他出库管理导出与下载中心查询能力
+      env: null
+      command: null
+      args: null
+      url: http://host.docker.internal:8080/mcp
+      headers: null
+a2a_config:
+  a2a_servers: [ ]
+search_config:
+  cache_enabled: true
+  cache_ttl_seconds: 3600
+  cache_key_prefix: "search"
+  fetch_timeout: 15
+  fetch_max_retries: 2
+  fetch_max_chars: 10000
+  fetch_max_concurrency: 5
+  deep_research_config:
+    max_depth: 2
+    results_per_search: 5
+    max_insights: 20
+    time_limit_seconds: 120
+# 工具结果缓存: 幂等工具结果缓存,避免重复调用相同工具的额外开销
+# 白名单机制: 仅缓存cacheable_tools中声明的工具,默认不缓存,确保安全
+tool_cache_config:
+  enabled: true
+  ttl_seconds: 1800
+  key_prefix: "tool"
+  cacheable_tools:
+    - web_search
+    - deep_research
+    - file_read
+    - skill_list
+  cacheable_mcp_tools:
+    - maps_weather
+    - maps_geo
+    - maps_direction
+    # system 供应链系统幂等查询工具(导出类工具不缓存,避免任务状态丢失)
+    - mcp_system_getDownloadTaskList
+    - mcp_system_getCategoryList
+    - mcp_system_getProductList
+    - mcp_system_getStockList
+    - mcp_system_getInboundDetailList
+    - mcp_system_getOutboundDetailList
+    - mcp_system_getOtherOutboundList
+# 工具并行执行: ReActAgent 多工具调用并行化(共享状态工具仍串行)
+# 黑名单机制: 仅 stateful_tool_prefixes/stateful_tool_names 中的工具串行,其余可并行
+# 参数级隔离: stateful_tool_arg_keys 中的工具按指定参数值隔离,同值串行,不同值可并行
+# 异常时改 enabled: false 即秒级回滚到串行路径
+tool_execution_config:
+  enabled: true
+  max_concurrency: 5
+  stateful_tool_prefixes:
+    - shell_
+    - browser_
+  stateful_tool_names:
+    - file_write
+    - file_delete
+    - file_move
+    - file_upload
+  # 参数级隔离工具: shell_execute 按 session_id 隔离
+  # 同一 session_id 的 shell_execute 串行(共享sandbox会话状态),
+  # 不同 session_id 的 shell_execute 可并行(独立sandbox会话)
+  stateful_tool_arg_keys:
+    shell_execute:
+      - session_id
+# 幂等工具调用去重(P10-1,通用型框架能力): 防止LLM在长会话中因记忆压缩而重复发起相同参数的幂等写操作
+# 通用性设计: 框架层不绑定具体业务,由业务方在 idempotent_tools 中声明需去重的工具白名单
+# 白名单机制: 仅 idempotent_tools 中声明的工具去重,默认不去重,确保安全
+# TTL较长(1小时): 覆盖一轮完整会话,避免会话内重复发起造成额外耗时(任务发起+轮询等待)
+idempotent_tool_dedup_config:
+  enabled: true
+  ttl_seconds: 3600
+  key_prefix: "tool_dedup"
+  idempotent_tools:
+    - mcp_system_getOutboundDetailExport  # 出库明细导出(业务方声明)
+    - mcp_system_getInboundDetailExport   # 入库明细导出(业务方声明)
+    - mcp_system_getOtherOutboundExport   # 其他出库导出(业务方声明)
+# 会话级提示词缓存: 持久化MCP搜索/描述结果、Skills技能指南、A2A Agent卡片到Redis
+# L1内存+L2 Redis两级缓存: L1零延迟覆盖高频场景,L2持久化覆盖实例重建场景
+# TTL对齐会话超时(4小时): 覆盖完整会话生命周期,避免长会话中LLM上下文压缩遗忘后重复search/describe
+# 静默降级: Redis异常时降级L1内存,不阻塞主流程
+session_prompt_cache_config:
+  enabled: true
+  ttl_seconds: 14400  # 缓存TTL(秒),4小时,对齐session_timeout_seconds
+  key_prefix: "prompt"

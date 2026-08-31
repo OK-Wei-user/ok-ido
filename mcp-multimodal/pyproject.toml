@@ -1,0 +1,23 @@
+[project]
+name = "mcp-multimodal"
+version = "0.2.0"
+description = "Multimodal MCP service based on BigModel API with Playwright screenshot support"
+requires-python = ">=3.12"
+dependencies = [
+    "mcp>=1.22.0",
+    "httpx>=0.28.1",
+    "pyyaml>=6.0",
+    "pydantic>=2.11.0",
+    "python-pptx>=1.0.2",
+    "pypdf>=5.0.0",
+    "pillow>=11.0.0",
+    "playwright>=1.49.0",
+    "starlette>=0.41.0",
+    "uvicorn>=0.32.0",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.4.2",
+    "pytest-asyncio>=0.24.0",
+]

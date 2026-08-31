@@ -1,0 +1,133 @@
+services:
+  redis:
+    image: redis:7.2.4
+    container_name: redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --appendonly yes
+      --maxmemory 256mb
+      --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - IDO-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-postgres}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-postgres}
+      POSTGRES_DB: ${POSTGRES_DB:-ido}
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - IDO-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres} -d ${POSTGRES_DB:-ido}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  sandbox:
+    build:
+      context: ./sandbox
+      dockerfile: Dockerfile
+    image: sandbox:latest
+    container_name: sandbox
+    restart: "no"
+    networks:
+      - IDO-network
+
+  mcp-multimodal:
+    build:
+      context: ./mcp-multimodal
+      dockerfile: Dockerfile
+    image: mcp-multimodal:latest
+    container_name: mcp-multimodal
+    restart: unless-stopped
+    environment:
+      MULTIMODAL_API_KEY: ${MULTIMODAL_API_KEY:-}
+      MULTIMODAL_BASE_URL: ${MULTIMODAL_BASE_URL:-https://open.bigmodel.cn/api/paas/v4/}
+      MULTIMODAL_VL_MODEL: ${MULTIMODAL_VL_MODEL:-glm-4.6v}
+      MULTIMODAL_IMAGE_MODEL: ${MULTIMODAL_IMAGE_MODEL:-cogview-4}
+      MULTIMODAL_ASR_MODEL: ${MULTIMODAL_ASR_MODEL:-glm-asr-2512}
+      MCP_SERVER_HOST: "0.0.0.0"
+      MCP_SERVER_PORT: "9100"
+    ports:
+      - "${MCP_MULTIMODAL_PORT:-9100}:9100"
+    networks:
+      - IDO-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:9100/health"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  searxng:
+    image: searxng/searxng:latest
+    container_name: searxng
+    restart: unless-stopped
+    environment:
+      SEARXNG_BASE_URL: http://searxng:8080/
+      SEARXNG_SECRET: ${SEARXNG_SECRET:-$(openssl rand -hex 32)}
+    volumes:
+      - ./searxng/settings.yml:/etc/searxng/settings.yml:ro
+    networks:
+      - IDO-network
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:8080/healthz"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
+
+  api:
+    build:
+      context: ./api
+      dockerfile: Dockerfile
+    image: api:latest
+    container_name: api
+    restart: unless-stopped
+    env_file:
+      - .env
+    ports:
+      - "${API_PORT:-8000}:8000"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      mcp-multimodal:
+        condition: service_healthy
+      searxng:
+        condition: service_healthy
+    networks:
+      - IDO-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8000/api/status"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+
+volumes:
+  redis_data:
+    driver: local
+  postgres_data:
+    driver: local
+
+networks:
+  IDO-network:
+    name: IDO-network
+    driver: bridge

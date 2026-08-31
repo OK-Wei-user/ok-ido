@@ -1,0 +1,25 @@
+# Python-generated files
+__pycache__/
+*.py[oc]
+build/
+dist/
+wheels/
+*.egg-info
+
+# Virtual environments
+.venv
+
+# 忽略所有__pycache__
+**/__pycache__/
+
+
+# 部署与测试输出日志(含敏感运行时信息,不入版本库)
+**/deploy_output.log
+**/e2e_test_output.log
+**/e2e_3session_output.log
+**/e2e_p1p2p3_output.log
+
+# 本地环境变量与密钥配置(不入版本库)
+.env
+.env.local
+mcp-multimodal/config.yaml
