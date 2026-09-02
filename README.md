@@ -999,3 +999,13 @@ docker compose -f docker-compose.prod.yml build api && docker compose -f docker-
 <p align="center">
   <img src="example-image/感觉不错请喝杯咖啡吧.jpg" alt="感觉不错请喝杯咖啡吧" width="300" />
 </p>
+
+---
+
+## 加入群聊
+
+欢迎加入交流群，一起探讨 AI Agent 的使用与开发：
+
+<p align="center">
+  <img src="example-image/加入群聊.jpg" alt="加入群聊" width="300" />
+</p>
