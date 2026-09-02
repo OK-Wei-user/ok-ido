@@ -989,3 +989,13 @@ docker compose -f docker-compose.prod.yml build api && docker compose -f docker-
 | [环境部署.md](docs/环境部署.md) | 部署快速参考（参考若依框架规范），涵盖准备工作、运行系统、必要配置、部署系统、环境变量、Nginx 配置、常见问题 |
 | [架构演进与优化方案](docs/optimization/architect_optimization_plan.md) | 系统架构演进记录、批次优化方案与 E2E 验证报告 |
 | [提示词冲突优化与异步退避修复方案](.trae/documents/提示词冲突优化与异步退避修复方案.md) | 提示词架构修复方案（文档生成能力边界澄清、异步任务 B1/B2 矛盾消除） |
+
+---
+
+## 支持项目
+
+如果这个项目对你有帮助，感觉不错请喝杯咖啡吧：
+
+<p align="center">
+  <img src="example-image/感觉不错请喝杯咖啡吧.jpg" alt="感觉不错请喝杯咖啡吧" width="300" />
+</p>
